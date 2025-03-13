@@ -39,6 +39,10 @@ std::string lexer::token_kind_string(Token_Kind token_kind){
             return "EQUALS_TOKEN";
         case ASSIGN_TOKEN:
             return "ASSIGN_TOKEN";
+        case PLUS_TOKEN:
+            return "PLUS_TOKEN";
+        case MINUS_TOKEN:
+            return "MINUS_TOKEN";
         case SEMICOLON_TOKEN:
             return "SEMICOLON_TOKEN";
         case IF_TOKEN:
@@ -112,29 +116,35 @@ void lexer::tokenize(){
             source_file.unget();
         }
 
-        else if(c == ';'){
+        else if(c == '+' || c == '-' || c == ';' || c == '(' || c == ')' || c == '{' || c == '}'){
             word = word + c;
             
             token.value = word;
-            token.token_kind = Token_Kind::SEMICOLON_TOKEN;
-            token_vector.push_back(token);
-            word = "";
-        }
-        
-        else if(c == '(' || c == ')'){
-            word = word + c;
-            
-            token.value = word;
-            token.token_kind = (c == '(')?Token_Kind::OPENPARA_TOKEN:Token_Kind::CLOSEPARA_TOKEN;
-            token_vector.push_back(token);
-            word = "";
-        }
+            switch(c){
+                case '+':
+                   token.token_kind = Token_Kind::PLUS_TOKEN; 
+                   break;
+                case '-':
+                   token.token_kind = Token_Kind::MINUS_TOKEN; 
+                   break;
+                case ';':
+                   token.token_kind = Token_Kind::SEMICOLON_TOKEN; 
+                   break;
+                case '(':
+                   token.token_kind = Token_Kind::OPENPARA_TOKEN; 
+                   break;
+                case ')':
+                   token.token_kind = Token_Kind::CLOSEPARA_TOKEN; 
+                   break;
+                case '{':
+                   token.token_kind = Token_Kind::OPENBRAC_TOKEN; 
+                   break;
+                case '}':
+                   token.token_kind = Token_Kind::CLOSEBRAC_TOKEN; 
+                   break;
+            }
 
-        else if(c == '{' || c == '}'){
-            word = word + c;
-            
             token.value = word;
-            token.token_kind = (c == '{')?Token_Kind::OPENBRAC_TOKEN:Token_Kind::CLOSEBRAC_TOKEN;
             token_vector.push_back(token);
             word = "";
         }

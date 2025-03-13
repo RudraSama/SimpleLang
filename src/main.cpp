@@ -7,7 +7,7 @@
 
 int main(){
 
-    std::string file_url = "source_file.simpl";
+    std::string file_url = "test/source_file.simpl";
     lexer l(file_url);
     l.tokenize();
     l.print_tokens();
