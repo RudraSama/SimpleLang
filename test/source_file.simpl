@@ -1,0 +1,6 @@
+int a = 7;
+int 
+b = 5;
+if ( a == b ){
+    a = a + b;
+}
