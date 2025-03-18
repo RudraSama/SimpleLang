@@ -1,6 +1,6 @@
 CXX = g++
 CFLAGS = -Wall -Wextra -Iinclude
-
+CDEBUG = -g
 SRC_DIR = src
 
 
@@ -11,7 +11,7 @@ SOURCES = $(wildcard $(SRC_DIR)/**/*.cpp) $(wildcard $(SRC_DIR)/*.cpp)
 TARGET = main
 
 $(TARGET) : $(SOURCES)
-	$(CXX) $(CFLAGS) -o $@ $^
+	$(CXX) $(CFLAGS) $(CDEBUG) -o $@ $^
 
 clean:
 	rm main

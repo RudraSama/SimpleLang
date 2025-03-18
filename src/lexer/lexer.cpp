@@ -49,14 +49,16 @@ std::string lexer::token_kind_string(Token_Kind token_kind){
             return "IF_TOKEN";
         case ELSE_TOKEN:
             return "ELSE_TOKEN";
-        case OPENPARA_TOKEN:
-            return "OPENPARA_TOKEN";
-        case CLOSEPARA_TOKEN:
-            return "CLOSEPARA_TOKEN";
+        case OPENPAREN_TOKEN:
+            return "OPENPAREN_TOKEN";
+        case CLOSEPAREN_TOKEN:
+            return "CLOSEPAREN_TOKEN";
         case OPENBRAC_TOKEN:
             return "OPENBRAC_TOKEN";
         case CLOSEBRAC_TOKEN:
             return "CLOSEBRAC_TOKEN";
+        case EOF_TOKEN:
+            return "EOF_TOKEN";
         default:
             return "Unknown Token";
     }
@@ -131,10 +133,10 @@ std::vector<Token> lexer::tokenize(){
                    token.token_kind = Token_Kind::SEMICOLON_TOKEN; 
                    break;
                 case '(':
-                   token.token_kind = Token_Kind::OPENPARA_TOKEN; 
+                   token.token_kind = Token_Kind::OPENPAREN_TOKEN; 
                    break;
                 case ')':
-                   token.token_kind = Token_Kind::CLOSEPARA_TOKEN; 
+                   token.token_kind = Token_Kind::CLOSEPAREN_TOKEN; 
                    break;
                 case '{':
                    token.token_kind = Token_Kind::OPENBRAC_TOKEN; 
@@ -156,7 +158,11 @@ std::vector<Token> lexer::tokenize(){
 
 
     }
-
+    
+    token.value = "EOF";
+    token.token_kind = EOF_TOKEN;
+    token_vector.push_back(token);
+    
     return token_vector;
 
 }

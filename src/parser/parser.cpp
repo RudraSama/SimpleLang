@@ -43,6 +43,7 @@ int parser::literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token
 }
 
 void parser::parse(){
+
     TreeNode *node = program();
 
     if(node == nullptr){
@@ -51,6 +52,7 @@ void parser::parse(){
     else{
         node->print();
     }
+    std::cout<<std::endl;
 }
 
 TreeNode *parser::program(){
@@ -60,13 +62,37 @@ TreeNode *parser::program(){
         if(!expect(Token_Kind::IDENTIFIER_TOKEN)){
             return nullptr;
         }
-
         TreeNode *node = parse_statement();
         return node;
     }
     else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
         TreeNode *node = parse_statement();
         return node;
+    }
+    else if(peek().token_kind == Token_Kind::IF_TOKEN){
+        next_token();
+        if(!expect(Token_Kind::OPENPAREN_TOKEN)){
+            return nullptr;
+        }
+        next_token();
+        TreeNode *left = parse_expression();
+        left->print();
+        next_token();
+        std::cout<<std::endl;
+        TreeNode *right = parse_expression();
+        right->print();
+        std::cout<<std::endl;
+        if(!expect(Token_Kind::CLOSEPAREN_TOKEN)){
+            return nullptr;
+        }
+        next_token();
+        if(!expect(Token_Kind::OPENBRAC_TOKEN)){
+            return nullptr;
+        }
+        next_token();
+        if(!expect(Token_Kind::CLOSEBRAC_TOKEN)){
+            return nullptr;
+        }
     }
     return nullptr;
 }
@@ -79,9 +105,16 @@ TreeNode *parser::parse_statement(){
     if(expect(Token_Kind::ASSIGN_TOKEN)){
         //TODO look in symbol table before assigning value
         next_token();
-        TreeNode *node = new Assign("=", new Identifier(t.value), parse_expression());
+        TreeNode *right = parse_expression();
+        TreeNode *node = new Assign(new Identifier(t.value), "=",  right);
+
+        if(!expect(Token_Kind::SEMICOLON_TOKEN)){
+            return nullptr;
+        }
+
         return node;
     }
+
     return nullptr;
 }
 
@@ -96,10 +129,10 @@ TreeNode *parser::parse_term(){
         next_token();
         return node;
     }
-    else if(peek().token_kind == Token_Kind::OPENPARA_TOKEN){
+    else if(peek().token_kind == Token_Kind::OPENPAREN_TOKEN){
         next_token(); //skipping '('
-        TreeNode *node = parse_expression(true); //true defines, it is a group expression
-        if(!expect(Token_Kind::CLOSEPARA_TOKEN)){
+        TreeNode *node = parse_expression(); 
+        if(!expect(Token_Kind::CLOSEPAREN_TOKEN)){
             return nullptr;
         }
         next_token(); //skipping ')'
@@ -112,10 +145,10 @@ TreeNode *parser::parse_term(){
     return nullptr;
 }
 
-TreeNode *parser::parse_expression(bool group_expr){
+TreeNode *parser::parse_expression(){
     TreeNode *left = parse_term();
     //This loop helps in handling associativity
-    while(true){
+    while(peek().token_kind != Token_Kind::EOF_TOKEN){
         if(peek().token_kind == Token_Kind::PLUS_TOKEN){
             next_token();
             TreeNode *right = parse_term();
@@ -142,12 +175,6 @@ TreeNode *parser::parse_expression(bool group_expr){
                 left = new BinaryExpr(left, "-", right);
             }
         }
-
-        else if(!group_expr && peek().token_kind == Token_Kind::CLOSEPARA_TOKEN){
-            std::cout<<"Unexpected : "<<peek().value<<std::endl;
-            return nullptr;
-        }
-
         else{
             return left;
         }

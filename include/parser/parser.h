@@ -33,9 +33,9 @@ class Assign : public TreeNode{
         TreeNode *left;
         TreeNode *right;
     public:
-        Assign(std::string value, TreeNode *left, TreeNode *right){
-            this->value = value;
+        Assign(TreeNode *left, std::string value, TreeNode *right){
             this->left = left;
+            this->value = value;
             this->right = right;
         }
 
@@ -73,7 +73,7 @@ class BinaryExpr : public TreeNode{
         TreeNode *left;        //Left side of expression
         TreeNode *right;       //Right side of expression
     public:
-        BinaryExpr(TreeNode* left, std::string value, TreeNode* right){
+        BinaryExpr(TreeNode *left, std::string value, TreeNode *right){
             this->left = left;
             this->value = value;
             this->right = right;
@@ -91,6 +91,32 @@ class BinaryExpr : public TreeNode{
         }
 };
 
+class IFExpr : public TreeNode{
+    private:
+        std::string value;
+        TreeNode *left;
+        TreeNode *right;
+        TreeNode *block;
+    public:
+        IFExpr(TreeNode *left, std::string value, TreeNode *right, TreeNode *block){
+            this->left = left;
+            this->value = value;
+            this->right = right;
+            this->block = block;
+        }
+
+        void print(){
+            left->print();
+            std::cout<<" ";
+            std::cout<<value;
+            std::cout<<" ";
+            right->print();
+            std::cout<<" { ";
+            block->print();
+            std::cout<<" } ";
+        }
+};
+
 class parser{
     private:
         std::vector<Token> token_vector;
@@ -102,7 +128,7 @@ class parser{
         int literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token_kind);
         TreeNode *parse_statement();    //This will parse statements like 'int a = 5 + 6'
         TreeNode *program();
-        TreeNode *parse_expression(bool group_expr = false);   //This will parse expressoin 
+        TreeNode *parse_expression();   //This will parse expressoin 
         TreeNode *parse_term();         //This will parse Term (Literal, Identifier, OpenPara)
 
     public:
