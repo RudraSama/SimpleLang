@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <vector>
 #include <fstream>
@@ -33,10 +34,10 @@ class lexer{
         bool is_alpha(char c);
         bool is_number(char c);
         Token_Kind identifier_or_keyword_check(std::string word);
-        std::string token_kind_string(Token_Kind token_kind);
     public:
         lexer(std::string &file_url);
-        void tokenize();
+        std::vector<Token> tokenize();
+        static std::string token_kind_string(Token_Kind token_kind);
         void print_tokens();
         void print_file_content();
 };

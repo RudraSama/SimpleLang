@@ -68,7 +68,7 @@ void lexer::print_tokens(){
     }
 }
 
-void lexer::tokenize(){
+std::vector<Token> lexer::tokenize(){
     char c;
     std::string word;
     Token token;
@@ -153,7 +153,11 @@ void lexer::tokenize(){
             //Handling if character is something else
         }
 
+
+
     }
+
+    return token_vector;
 
 }
 
