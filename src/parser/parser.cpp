@@ -2,187 +2,238 @@
 #include <parser/parser.h>
 #include <iostream>
 
-parser::parser(std::vector<Token> token_vector){
+Parser::Parser(std::vector<Token> token_vector, std::string file_name){
     this->token_vector = std::move(token_vector);
+    this->file_name = file_name;
 }
 
-Token parser::peek(){
+
+Token Parser::peek(){
     return token_vector[index];
 }
 
-void parser::next_token(){
+
+void Parser::next_token(){
     index++;
 }
 
-bool parser::expect(Token_Kind token_kind){
+
+bool Parser::expect(Token_Kind token_kind){
     if(token_kind == peek().token_kind){
         return true;
     }
-    std::cout<<"Expected "<<lexer::token_kind_string(token_kind)<<", got "<<peek().value<<std::endl;
+    if(peek().token_kind != Token_Kind::EOF_TOKEN){
+        std::string message = "Expected " + Lexer::token_to_string(token_kind).value + " Got " + peek().value;
+        report_syntax_error(message);
+    }
     return false;
 }
 
-bool parser::is_literal(TreeNode *node){
+
+void Parser::report_syntax_error(std::string message){
+    int line = peek().line;
+    int column = peek().column;
+    std::cerr<<file_name<<":"<<line<<":"<<column<<" "<<message<<std::endl;
+}
+
+
+bool Parser::is_literal(TreeNode *node){
     return typeid(*node).name() == typeid(Literal).name();
 }
 
-int parser::literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token_kind){
-    //We need to dynamically caste TreeNodes to Literal
+
+bool Parser::is_if_statement(TreeNode *node){
+    return typeid(*node).name() == typeid(IFStatement).name();
+}
+
+
+bool Parser::is_assign(TreeNode *node){
+    return typeid(*node).name() == typeid(Assign).name();
+}
+
+
+bool Parser::is_identifier(TreeNode *node){
+    return typeid(*node).name() == typeid(Identifier).name();
+}
+
+
+bool Parser::is_binary_expression(TreeNode *node){
+    return typeid(*node).name() == typeid(BinaryExpr).name();
+}
+
+
+int Parser::literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token_kind){
     Literal *l = dynamic_cast<Literal*>(left);
     Literal *r = dynamic_cast<Literal*>(right);
     
     switch(token_kind){
-        case PLUS_TOKEN:
-            return l->get_value() + r->get_value();
-        case MINUS_TOKEN:
-            return l->get_value() - r->get_value();
-        default:
-            return 0;
+        case PLUS_TOKEN: return l->get_value() + r->get_value();
+        case MINUS_TOKEN: return l->get_value() - r->get_value();
+        default: return 0;
     }
-    return 0;
 }
 
-void parser::parse(){
 
+void Parser::parse(){
     TreeNode *node = program();
+    TreeNode *temp = node;
+    
+    while(temp->get_next() != nullptr){
+        temp->get_node()->print();
+        std::cout<<std::endl;
+        temp = temp->get_next();
+    }
 
-    if(node == nullptr){
-        std::cout<<"Node is null";
-    }
-    else{
-        node->print();
-    }
     std::cout<<std::endl;
 }
 
-TreeNode *parser::program(){
-    if(peek().token_kind == Token_Kind::INT_TOKEN) {
-        //TODO need to add Variable in symbol table before going to next token
-        next_token();
-        if(!expect(Token_Kind::IDENTIFIER_TOKEN)){
-            return nullptr;
-        }
-        TreeNode *node = parse_statement();
-        return node;
-    }
-    else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
-        TreeNode *node = parse_statement();
-        return node;
-    }
-    else if(peek().token_kind == Token_Kind::IF_TOKEN){
-        next_token();
-        if(!expect(Token_Kind::OPENPAREN_TOKEN)){
-            return nullptr;
-        }
-        next_token();
-        TreeNode *left = parse_expression();
-        left->print();
-        next_token();
-        std::cout<<std::endl;
-        TreeNode *right = parse_expression();
-        right->print();
-        std::cout<<std::endl;
-        if(!expect(Token_Kind::CLOSEPAREN_TOKEN)){
-            return nullptr;
-        }
-        next_token();
-        if(!expect(Token_Kind::OPENBRAC_TOKEN)){
-            return nullptr;
-        }
-        next_token();
-        if(!expect(Token_Kind::CLOSEBRAC_TOKEN)){
-            return nullptr;
-        }
-    }
-    return nullptr;
+
+TreeNode *Parser::program(){
+    TreeNode *statements = parse_statements();
+    return statements;
 }
 
-TreeNode *parser::parse_statement(){
-    Token t = peek(); //Storing Identifier
-    //skip Identifier
+
+TreeNode *Parser::parse_statements(){
+    TreeNode *statements_head = new Statements();
+    TreeNode *statements = statements_head;
+    
+    //Loop till we get Closed Bracket (IF Block) or EOF(Without IF Block)
+    while(peek().token_kind != Token_Kind::EOF_TOKEN && peek().token_kind != Token_Kind::CLOSEBRAC_TOKEN){
+        TreeNode *node = nullptr;
+        if(peek().token_kind == Token_Kind::INT_TOKEN) {
+            next_token();
+            if(!expect(Token_Kind::IDENTIFIER_TOKEN)) return nullptr;
+
+            //TODO need to add Variable in symbol table before going to next token
+            node = parse_statement();
+            if(!node && peek().token_kind == Token_Kind::SEMICOLON_TOKEN){
+                next_token();
+                continue;
+            } 
+            if(!node) break;
+        }
+        else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
+            node = parse_statement();
+            if(!node) break;
+        }
+        else if(peek().token_kind == Token_Kind::IF_TOKEN){
+            next_token();
+            node = parse_ifstatement();
+            if(!node) break;
+        }
+        statements->add_node(node);
+        statements->add_next(new Statements());
+        statements = statements->get_next();
+    }
+
+    return statements_head;
+}
+
+
+TreeNode *Parser::parse_ifstatement(){
+    if(!expect(Token_Kind::OPENPAREN_TOKEN)) return nullptr;
     next_token();
-    //looking for '=' symbol, if symbol is not there, it means it was just variable initialization
-    if(expect(Token_Kind::ASSIGN_TOKEN)){
-        //TODO look in symbol table before assigning value
-        next_token();
-        TreeNode *right = parse_expression();
-        TreeNode *node = new Assign(new Identifier(t.value), "=",  right);
 
-        if(!expect(Token_Kind::SEMICOLON_TOKEN)){
-            return nullptr;
-        }
+    TreeNode *left = parse_expression();
+    if(!left) return nullptr;
 
-        return node;
-    }
+    std::string value = peek().value;
+    next_token();
 
-    return nullptr;
+    TreeNode *right = parse_expression();
+    if(!right) return nullptr;
+    if(!expect(Token_Kind::CLOSEPAREN_TOKEN)) return nullptr;
+    next_token();
+    if(!expect(Token_Kind::OPENBRAC_TOKEN)) return nullptr;
+    next_token();
+
+    //Parsing all statements inside if block
+    TreeNode *block = parse_statements();
+    if(!block->get_node()) return nullptr;
+
+    if(!expect(Token_Kind::CLOSEBRAC_TOKEN)) return nullptr;
+    
+    return new IFStatement(left, value, right, block);
 }
 
-TreeNode *parser::parse_term(){
+
+TreeNode *Parser::parse_statement(){
+    //Storing Identifier
+    Token t = peek(); 
+    next_token();
+
+    if(peek().token_kind == Token_Kind::SEMICOLON_TOKEN) return nullptr;
+
+    if(!expect(Token_Kind::ASSIGN_TOKEN)) return nullptr;
+    //TODO look in symbol table before assigning value
+    next_token();
+
+    TreeNode *right = parse_expression();
+    TreeNode *node = new Assign(new Identifier(t.value), "=",  right);
+
+    if(!expect(Token_Kind::SEMICOLON_TOKEN)) return nullptr;
+    next_token();
+    return node;
+}
+
+
+TreeNode *Parser::parse_term(){
+    TreeNode *node = nullptr;
+
     if(peek().token_kind == Token_Kind::NUMBER_TOKEN){
         int num = std::atoi(peek().value.c_str());
         next_token();
-        return new Literal(num);
+        node = new Literal(num);
     }
     else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
-        TreeNode *node = new Identifier(peek().value);
+        node = new Identifier(peek().value);
         next_token();
-        return node;
     }
     else if(peek().token_kind == Token_Kind::OPENPAREN_TOKEN){
         next_token(); //skipping '('
-        TreeNode *node = parse_expression(); 
-        if(!expect(Token_Kind::CLOSEPAREN_TOKEN)){
-            return nullptr;
-        }
+        node = parse_expression(); 
+        if(!expect(Token_Kind::CLOSEPAREN_TOKEN)) return nullptr;
         next_token(); //skipping ')'
-        return node;
     }
     else{
-        //need to return more detailed error
-        std::cout<<"Error in parse_term "<<peek().value<<std::endl;
+        report_syntax_error("Expected Identifer or Number");
     }
-    return nullptr;
+    return node;
 }
 
-TreeNode *parser::parse_expression(){
+TreeNode *Parser::parse_expression(){
     TreeNode *left = parse_term();
+
     //This loop helps in handling associativity
     while(peek().token_kind != Token_Kind::EOF_TOKEN){
-        if(peek().token_kind == Token_Kind::PLUS_TOKEN){
+        Token token = peek();
+        if(token.token_kind == Token_Kind::PLUS_TOKEN || token.token_kind == Token_Kind::MINUS_TOKEN){
             next_token();
             TreeNode *right = parse_term();
+            if(!right) return nullptr;
 
-            //if both left and right are Literal, just add them
             if(is_literal(left) && is_literal(right)){
-                //creating new literal with addition
-                left = new Literal(literal_evaluation(left, right, Token_Kind::PLUS_TOKEN));
+                left = new Literal(literal_evaluation(left, right, token.token_kind));
             }
             else{
-                left = new BinaryExpr(left, "+", right);
-            }
-        }
-        else if(peek().token_kind == Token_Kind::MINUS_TOKEN){
-            next_token();
-            TreeNode *right = parse_term();
-
-            //if both left and right are Literal, just sub them
-            if(is_literal(left) && is_literal(right)){
-                //creating new literal with subtraction 
-                left = new Literal(literal_evaluation(left, right, Token_Kind::MINUS_TOKEN));
-            }
-            else{
-                left = new BinaryExpr(left, "-", right);
+                std::string symbol = token.token_kind == (Token_Kind::PLUS_TOKEN)?"+":"-";
+                left = new BinaryExpr(left, symbol, right);
             }
         }
         else{
             return left;
         }
     }
+    
+    //This statement will only run when peek() reached at EOF and didn't find any valid syntax
+    std::string message = "Expected " + Lexer::token_to_string(Token_Kind::SEMICOLON_TOKEN).value;
+    report_syntax_error(message);
+    
     return nullptr;
 }
 
-void parser::print_tokens(){
+void Parser::print_tokens(){
     for(auto t : token_vector){
         std::cout<<t.value;
     }

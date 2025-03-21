@@ -18,9 +18,9 @@ int main(int argc, char *argv[]){
 //    file_url = argv[1];
 
     std::vector<Token> token_vector;
-    lexer l(file_url);
+    Lexer l(file_url);
     token_vector = l.tokenize();
-    parser p(token_vector);
+    Parser p(token_vector, file_url);
     p.parse();
 
 
