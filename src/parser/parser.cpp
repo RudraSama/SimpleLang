@@ -1,6 +1,7 @@
 #include <lexer/lexer.h>
 #include <parser/parser.h>
 #include <iostream>
+#include <symbol_table/symbol_table.h>
 
 Parser::Parser(std::vector<Token> token_vector, std::string file_name){
     this->token_vector = std::move(token_vector);
@@ -74,25 +75,83 @@ int Parser::literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token
 }
 
 
-void Parser::parse(){
+TreeNode *Parser::parse(){
     TreeNode *node = program();
-    TreeNode *temp = node;
     
-    while(temp->get_next() != nullptr){
-        temp->get_node()->print();
-        std::cout<<std::endl;
-        temp = temp->get_next();
+    traverse(node);
+
+    return node;
+
+}
+
+void Parser::traverse(TreeNode *head){
+    if(head == nullptr) return;
+
+    while(head->get_next() != nullptr){
+        sub_traverse(head->get_node());
+        head = head->get_next();
     }
+}
+
+void Parser::sub_traverse(TreeNode *node){
+    if(is_assign(node))
+        traverse_assign(node);
+    else if(is_if_statement(node))
+        traverse_if_statement(node);
+    else if(is_binary_expression(node))
+        traverse_binary_expression(node);
+    else if(is_identifier(node))
+        std::cout<<dynamic_cast<Identifier*>(node)->get_value();
+    else if(is_literal(node))
+        std::cout<<dynamic_cast<Literal*>(node)->get_value();
+}
+
+void Parser::traverse_assign(TreeNode *node){
+    Assign *assign = dynamic_cast<Assign*>(node);
+    std::cout<<dynamic_cast<Identifier*>(assign->get_left())->get_value();
+    std::cout<<assign->get_value();
+
+    sub_traverse(assign->get_right());
 
     std::cout<<std::endl;
 }
 
+void Parser::traverse_binary_expression(TreeNode *node){
+    BinaryExpr *binary_expr = dynamic_cast<BinaryExpr*>(node);
+
+    sub_traverse(binary_expr->get_left());
+
+    std::cout<<binary_expr->get_value();
+
+    sub_traverse(binary_expr->get_right());
+}
+
+void Parser::traverse_if_statement(TreeNode *node){
+    IFStatement *if_statement = dynamic_cast<IFStatement*>(node);
+
+    std::cout<<"if (";
+
+    sub_traverse(if_statement->get_left());
+
+    std::cout<<if_statement->get_value();
+
+    sub_traverse(if_statement->get_left());
+
+    std::cout<<"){";
+
+    std::cout<<std::endl;
+
+    traverse(if_statement->get_block());
+
+    std::cout<<"}";
+
+    std::cout<<std::endl;
+}
 
 TreeNode *Parser::program(){
     TreeNode *statements = parse_statements();
     return statements;
 }
-
 
 TreeNode *Parser::parse_statements(){
     TreeNode *statements_head = new Statements();
@@ -105,22 +164,35 @@ TreeNode *Parser::parse_statements(){
             next_token();
             if(!expect(Token_Kind::IDENTIFIER_TOKEN)) return nullptr;
 
-            //TODO need to add Variable in symbol table before going to next token
+            ST.insert_symbol(peek().value, "int");
+
             node = parse_statement();
             if(!node && peek().token_kind == Token_Kind::SEMICOLON_TOKEN){
                 next_token();
                 continue;
             } 
-            if(!node) break;
+            if(!node){
+                delete statements_head;
+                statements_head = nullptr;
+                break;
+            }
         }
         else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
             node = parse_statement();
-            if(!node) break;
+            if(!node){
+                delete statements_head;
+                statements_head = nullptr;
+                break;
+            }
         }
         else if(peek().token_kind == Token_Kind::IF_TOKEN){
             next_token();
             node = parse_ifstatement();
-            if(!node) break;
+            if(!node){
+                delete statements_head;
+                statements_head = nullptr;
+                break;
+            }
         }
         statements->add_node(node);
         statements->add_next(new Statements());
@@ -150,7 +222,7 @@ TreeNode *Parser::parse_ifstatement(){
 
     //Parsing all statements inside if block
     TreeNode *block = parse_statements();
-    if(!block->get_node()) return nullptr;
+    if(!block) return nullptr;
 
     if(!expect(Token_Kind::CLOSEBRAC_TOKEN)) return nullptr;
     
@@ -166,11 +238,17 @@ TreeNode *Parser::parse_statement(){
     if(peek().token_kind == Token_Kind::SEMICOLON_TOKEN) return nullptr;
 
     if(!expect(Token_Kind::ASSIGN_TOKEN)) return nullptr;
-    //TODO look in symbol table before assigning value
+    if(!ST.exist(t.value)){
+        std::string message = "Variable "+ t.value + " is not defined ";
+        report_syntax_error(message);
+        return nullptr;
+    }
+
     next_token();
 
     TreeNode *right = parse_expression();
     TreeNode *node = new Assign(new Identifier(t.value), "=",  right);
+
 
     if(!expect(Token_Kind::SEMICOLON_TOKEN)) return nullptr;
     next_token();
@@ -188,6 +266,11 @@ TreeNode *Parser::parse_term(){
     }
     else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
         node = new Identifier(peek().value);
+        if(!ST.exist(peek().value)){
+            std::string message = "Variable "+ peek().value + " is not defined ";
+            report_syntax_error(message);
+            node = nullptr;
+        }
         next_token();
     }
     else if(peek().token_kind == Token_Kind::OPENPAREN_TOKEN){
@@ -204,6 +287,7 @@ TreeNode *Parser::parse_term(){
 
 TreeNode *Parser::parse_expression(){
     TreeNode *left = parse_term();
+    if(!left) return nullptr;
 
     //This loop helps in handling associativity
     while(peek().token_kind != Token_Kind::EOF_TOKEN){

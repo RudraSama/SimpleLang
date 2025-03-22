@@ -1,5 +1,6 @@
 #include <lexer/lexer.h>
 #include <iostream>
+#include <symbol_table/symbol_table.h>
 
 /**
  * Grammar for our langauge 
@@ -14,7 +15,14 @@ class TreeNode{
          * @brief prints tree.
          * @return void
         */
+        virtual ~TreeNode(){}
+
+        /** 
+         * @brief prints tree.
+         * @return void
+        */
         virtual void print(){}
+
 
         /** Only Statements Class will Implement these */
 
@@ -62,6 +70,14 @@ class Identifier : public TreeNode{
             this->value = value;
         }
 
+        /**
+         * @brief Returning value
+         * @return string
+         */
+        std::string get_value(){
+            return value;
+        }
+
         void print(){
             std::cout<<" ";
             std::cout<<value;
@@ -88,6 +104,35 @@ class Assign : public TreeNode{
             this->left = left;
             this->value = value;
             this->right = right;
+        }
+
+        ~Assign(){
+            delete left;
+            delete right;
+        }
+
+        /**
+         * @brief Returning value
+         * @return string
+         */
+        std::string get_value(){
+            return value;
+        }
+
+        /**
+         * @brief Return left side of Assign
+         * @return TreeNode 
+         */
+        TreeNode *get_left(){
+            return left;
+        }
+
+        /**
+         * @brief Return right side of Assign 
+         * @return string
+         */
+        TreeNode *get_right(){
+            return right;
         }
 
         void print(){
@@ -150,6 +195,35 @@ class BinaryExpr : public TreeNode{
             this->right = right;
         }
 
+        ~BinaryExpr(){
+            delete left;
+            delete right;
+        }
+
+        /**
+         * @brief Returning value
+         * @return string
+         */
+        std::string get_value(){
+            return value;
+        }
+
+        /**
+         * @brief Return Left side of Binary Expresion
+         * @return TreeNode
+         */
+        TreeNode *get_left(){
+            return left;
+        }
+
+        /**
+         * @brief Return Right side of Binary Expresion
+         * @return TreeNode
+         */
+        TreeNode *get_right(){
+            return right;
+        }
+
         void print(){
             std::cout<<"( ";
             left->print();
@@ -171,6 +245,10 @@ class Statements : public TreeNode{
 
     public:
 
+        ~Statements(){
+            delete node;
+            delete next;
+        }
         /** 
          * @brief Add statement to Current Node of Statements.
          * @param Node of statement. Any instance of TreeNode.
@@ -230,6 +308,44 @@ class IFStatement : public TreeNode{
             this->block = block;
         }
 
+        ~IFStatement(){
+            delete left;
+            delete right;
+            delete block;
+        }
+
+        /**
+         * @brief Returning value
+         * @return string
+         */
+        std::string get_value(){
+            return value;
+        }
+
+        /**
+         * @brief Returning left side of condition
+         * @return string
+         */
+        TreeNode *get_left(){
+            return left;
+        }
+
+        /**
+         * @brief Returning right side of condition 
+         * @return string
+         */
+        TreeNode *get_right(){
+            return right;
+        }
+
+        /**
+         * @brief Returning block of IF statement 
+         * @return string
+         */
+        TreeNode *get_block(){
+            return block;
+        }
+
         void print(){
             left->print();
             std::cout<<" ";
@@ -260,6 +376,7 @@ class Parser{
     private:
         std::vector<Token> token_vector;        //!< Vector for storing all tokens generated using Lexer 
         std::string file_name;                  //!< Source code file name 
+        SymbolTable ST;                         //!< Symbol_Table object
         int index = 0;                          //!< Stores current token index in Vector 
         /**
          * @brief Peek method to get current token in vector.
@@ -389,7 +506,42 @@ class Parser{
          * @brief Starts parsing tokens.
          * @return void
          */       
-        void parse();
+        TreeNode *parse();
+
+         /**
+         * @brief Traversing AST Tree.
+         * This is entry point of Traversing Tree.
+         * @param TreeNode head, head of AST
+         * @return void
+         */
+        void traverse(TreeNode *head);
+
+         /**
+         * @brief Traversig based on type of Grammar.
+         * This method calls other traversing methdos based on condition.
+         * @param TreeNode node 
+         * @return void
+         */
+        void sub_traverse(TreeNode *node);
+
+
+        /**
+         * @brief Travering Assign TreeNode
+         * @return void
+         */
+        void traverse_assign(TreeNode *node);
+
+        /**
+         * @brief Travering Binary Expression TreeNode  
+         * @return void
+         */
+        void traverse_binary_expression(TreeNode *node);
+
+        /**
+         * @brief Travering If Statement TreeNode  
+         * @return void
+         */
+        void traverse_if_statement(TreeNode *node);
 
          /**
          * @brief Print tokens.
