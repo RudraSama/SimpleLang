@@ -1,10 +1,8 @@
 #include <lexer/lexer.h>
-#include <iostream>
-#include <fstream>
 
 
-Lexer::Lexer(std::string &file_url){
-    this->source_file.open(file_url, std::fstream::in);
+Lexer::Lexer(std::string &input_file_url){
+    this->source_file.open(input_file_url, std::fstream::in);
 }
 
 
@@ -136,7 +134,7 @@ std::vector<Token> Lexer::tokenize(){
         //if first char is alpha, then whole word must be keyword or identifier
         if(is_alpha(c)){
             word = word + c;
-            while((c = source_file.get()) && (is_alpha(c) || (is_number(c)))){
+            while((c = source_file.get()) && (is_alpha(c) || (is_number(c)) || c == '_')){
                 word = word + c;
             }
 
@@ -188,13 +186,14 @@ std::vector<Token> Lexer::tokenize(){
             token.value = word;
             token.line = line_index;
             token.column = column_index;
-            if(word.compare("<"))
+
+            if(word.compare("<") == 0)
                 token.token_kind = Token_Kind::LESS_TOKEN;
-            else if(word.compare(">"))
+            else if(word.compare(">") == 0)
                 token.token_kind = Token_Kind::GREATER_TOKEN;
-            else if(word.compare("<="))
+            else if(word.compare("<=") == 0)
                 token.token_kind = Token_Kind::LESS_EQUALS_TOKEN;
-            else if(word.compare(">="))
+            else if(word.compare(">=") == 0)
                 token.token_kind = Token_Kind::GREATER_EQUALS_TOKEN;
             else
                 token.token_kind = Token_Kind::NOT_EQUALS_TOKEN;
@@ -246,6 +245,8 @@ std::vector<Token> Lexer::tokenize(){
     token.value = "EOF";
     token.token_kind = EOF_TOKEN;
     token_vector.push_back(token);
+
+    source_file.close();
     
     return token_vector;
 

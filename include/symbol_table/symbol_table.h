@@ -7,7 +7,7 @@
  */
 typedef struct {
     std::string data_type;
-    std::string address;
+    unsigned char address; //!< Address will never go above 255
 } Attribute; 
 
 /**
@@ -16,7 +16,7 @@ typedef struct {
  */
 class SymbolTable{
     private:
-        int MAX_MEMORY_LIMIT = 255; //!<< This is the maximum memory size of our 8 bit computer. (after 256 bytes, it roll over to 0)
+        unsigned char MAX_MEMORY_LIMIT = 128; //!<< This is the maximum memory size of our 8 bit computer. (Lower 128 bytes are allocated for Variable memory and upper 127 bytes are for Stack memory)
         std::unordered_map<std::string, Attribute> table;  //!< Unordered Hashmap for storing Symbols and its attributes.
     
     public:
@@ -24,9 +24,9 @@ class SymbolTable{
          * @brief This method is to insert symbol in symbol table.
          * @param string, symbol value
          * @param string, data_type.
-         * @return void 
+         * @return bool 
          */
-        void insert_symbol(std::string symbol, std::string data_type);
+        bool insert_symbol(std::string symbol, std::string data_type);
 
         /**
          * @brief This method is to check if symbol already exist in symbol table or not.
@@ -34,4 +34,11 @@ class SymbolTable{
          * @return bool
          */
         bool exist(std::string symbol);
+
+        /**
+         * @brief Returns address of variable.
+         * @param symbol value
+         * @return unsigened char 
+         */
+        unsigned char get_address(std::string symbol);
 }; 

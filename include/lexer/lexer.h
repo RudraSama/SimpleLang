@@ -1,5 +1,5 @@
 #pragma once
-#include <string>
+#include <iostream>
 #include <vector>
 #include <fstream>
 
@@ -82,9 +82,9 @@ class Lexer{
     public:
         /**
          * @brief Constructor for Lexer.
-         * @param file_url of source code.
+         * @param input_file_url of source code.
          */
-        Lexer(std::string &file_url);
+        Lexer(std::string &input_file_url);
 
         /**
          * @brief Create tokens from Stream of sourcer file.

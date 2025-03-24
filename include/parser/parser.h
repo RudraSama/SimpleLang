@@ -1,5 +1,7 @@
-#include <lexer/lexer.h>
+#pragma once
 #include <iostream>
+#include <file_writer/file_writer.h>
+#include <lexer/lexer.h>
 #include <symbol_table/symbol_table.h>
 
 /**
@@ -149,27 +151,27 @@ class Assign : public TreeNode{
  */
 class Literal : public TreeNode{
     private:
-        int value; //!< Integer value
+        unsigned char value; //!< Storing value from 1 to 255 only because of our CPU's memory constraint.
     public:
 
         /**
          * @brief Constructor of Assign
-         * @param value, Any valid Integer.
+         * @param value, Any valid int from 1 to 255.
          */
-        Literal(int value){
+        Literal(unsigned char value){
             this->value = value;
         }
 
         /**
          * @brief returns current value of Literal.  
-         * @param int.
+         * @param unsigned char.
          */
-        int get_value(){
+        unsigned char get_value(){
             return value;
         }
 
         void print(){
-            std::cout<<value;
+            std::cout<<(int)value;
         }
 };
 
@@ -178,7 +180,7 @@ class Literal : public TreeNode{
  */
 class BinaryExpr : public TreeNode{
     private:
-        std::string value;    //!<  value is an operator type (-, +) 
+        Token_Kind op;    //!<  op is an operator type (-, +) 
         TreeNode *left;       //!<  Left side of expression 
         TreeNode *right;      //!<  Right side of expression 
 
@@ -189,9 +191,9 @@ class BinaryExpr : public TreeNode{
          * @param value. (+, -).
          * @param right, instace of TreeNode (BinaryExpr, Identifier, Literal).
          */
-        BinaryExpr(TreeNode *left, std::string value, TreeNode *right){
+        BinaryExpr(TreeNode *left, Token_Kind op, TreeNode *right){
             this->left = left;
-            this->value = value;
+            this->op = op;
             this->right = right;
         }
 
@@ -204,8 +206,8 @@ class BinaryExpr : public TreeNode{
          * @brief Returning value
          * @return string
          */
-        std::string get_value(){
-            return value;
+        Token_Kind get_operator(){
+            return op;
         }
 
         /**
@@ -228,7 +230,7 @@ class BinaryExpr : public TreeNode{
             std::cout<<"( ";
             left->print();
             std::cout<<" ";
-            std::cout<<value;
+            std::cout<<Lexer::token_to_string(op).value;
             std::cout<<" ";
             right->print();
             std::cout<<" )";
@@ -289,7 +291,7 @@ class Statements : public TreeNode{
  */
 class IFStatement : public TreeNode{
     private:
-        std::string value;      //!< value. (<, >, ==, <=, >=, !=) 
+        Token_Kind condition;      //!< value. (<, >, ==, <=, >=, !=) 
         TreeNode *left;         //!< Left side of Condition 
         TreeNode *right;        //!< Right side of Condition  
         TreeNode *block;        //!< Block of Statements inside If (condition) {}
@@ -301,9 +303,9 @@ class IFStatement : public TreeNode{
          * @param right, instace of TreeNode (BinaryExpr, Identifier, Literal).
          * @param block, Statements.
          */
-        IFStatement(TreeNode *left, std::string value, TreeNode *right, TreeNode *block){
+        IFStatement(TreeNode *left, Token_Kind condition, TreeNode *right, TreeNode *block){
             this->left = left;
-            this->value = value;
+            this->condition = condition;
             this->right = right;
             this->block = block;
         }
@@ -318,8 +320,8 @@ class IFStatement : public TreeNode{
          * @brief Returning value
          * @return string
          */
-        std::string get_value(){
-            return value;
+        Token_Kind get_condition(){
+            return condition;
         }
 
         /**
@@ -349,7 +351,7 @@ class IFStatement : public TreeNode{
         void print(){
             left->print();
             std::cout<<" ";
-            std::cout<<value;
+            std::cout<<Lexer::token_to_string(condition).value;
             std::cout<<" ";
             right->print();
             std::cout<<" { ";
@@ -376,7 +378,9 @@ class Parser{
     private:
         std::vector<Token> token_vector;        //!< Vector for storing all tokens generated using Lexer 
         std::string file_name;                  //!< Source code file name 
-        SymbolTable ST;                         //!< Symbol_Table object
+        SymbolTable *ST;                         //!< Symbol_Table object pointer
+
+
         int index = 0;                          //!< Stores current token index in Vector 
         /**
          * @brief Peek method to get current token in vector.
@@ -398,47 +402,37 @@ class Parser{
         bool expect(Token_Kind token_kind);
 
         /**
-         * @brief Reporting any syntax error during parsing of tokens.
+         * @brief Reporting any syntax error when unexpected token is scanned parsing of tokens.
          * Shows error with std::cerr
-         * @param String Message 
+         * @param Token_Kind expected token,
+         * @param Token_Kind token got
          * @return void 
          */
-        void report_syntax_error(std::string message);
+        void report_unexpected_syntax_error(Token_Kind expected, Token_Kind got);
+        /**
+         * @brief Reporting error when undefined varaible is used.
+         * Shows error with std::cerr
+         * @param string value of identifier (variable).
+         * @return void 
+         */
+        void report_undefined_variable_error(std::string s);
 
         /**
-         * @brief Checks if the given Object is of type Literal or not.
-         * @param TreeNode 
-         * @return bool 
+         * @brief Reporting error when variable is already defined.
+         * Shows error with std::cerr
+         * @param string value of identifier (variable).
+         * @return void 
          */
-        bool is_literal(TreeNode *node);
+        void report_already_defined_variable_error(std::string s);
 
         /**
-         * @brief Checks if the given Object is of type IFStatement or not.
-         * @param TreeNode 
-         * @return bool 
+         * @brief Reporting error when too many variables are declared, causing memory limit exceed on 8 bit machine.
+         * Shows error with std::cerr
+         * @param string value of identifer (Variable).
+         * @return void 
          */
-        bool is_if_statement(TreeNode *node);
+        void report_memory_limit_exceed_error(std::string s);
 
-        /**
-         * @brief Checks if the given Object is of type Assign or not.
-         * @param TreeNode 
-         * @return bool 
-         */
-        bool is_assign(TreeNode *node);
-
-        /**
-         * @brief Checks if the given Object is of type Identifier or not.
-         * @param TreeNode 
-         * @return bool 
-         */
-        bool is_identifier(TreeNode *node);
-
-        /**
-         * @brief Checks if the given Object is of type BinaryExpr or not.
-         * @param TreeNode 
-         * @return bool 
-         */
-        bool is_binary_expression(TreeNode *node);
 
         /**
          * @brief Evalute the expression when both sides of expression are of Literal type.
@@ -497,56 +491,50 @@ class Parser{
         /**
          * @brief Constructor for Parse class
          * @param token_vector. Output of tokenizer method of Lexer.
-         * @param file_name. Source code file name.
+         * @param string file_name. Source code file name.
+         * @param pointer to SymbolTable object
          * @return void
          */
-        Parser(std::vector<Token> token_vector, std::string file_name);
+        Parser(std::vector<Token> token_vector, std::string file_name, SymbolTable *ST);
+
+        /**
+         * @brief Checks if the given Object is of type Literal or not.
+         * @param TreeNode 
+         * @return bool 
+         */
+        static bool is_literal(TreeNode *node);
+
+        /**
+         * @brief Checks if the given Object is of type IFStatement or not.
+         * @param TreeNode 
+         * @return bool 
+         */
+        static bool is_if_statement(TreeNode *node);
+
+        /**
+         * @brief Checks if the given Object is of type Assign or not.
+         * @param TreeNode 
+         * @return bool 
+         */
+        static bool is_assign(TreeNode *node);
+
+        /**
+         * @brief Checks if the given Object is of type Identifier or not.
+         * @param TreeNode 
+         * @return bool 
+         */
+        static bool is_identifier(TreeNode *node);
+
+        /**
+         * @brief Checks if the given Object is of type BinaryExpr or not.
+         * @param TreeNode 
+         * @return bool 
+         */
+        static bool is_binary_expression(TreeNode *node);
 
          /**
          * @brief Starts parsing tokens.
          * @return void
          */       
         TreeNode *parse();
-
-         /**
-         * @brief Traversing AST Tree.
-         * This is entry point of Traversing Tree.
-         * @param TreeNode head, head of AST
-         * @return void
-         */
-        void traverse(TreeNode *head);
-
-         /**
-         * @brief Traversig based on type of Grammar.
-         * This method calls other traversing methdos based on condition.
-         * @param TreeNode node 
-         * @return void
-         */
-        void sub_traverse(TreeNode *node);
-
-
-        /**
-         * @brief Travering Assign TreeNode
-         * @return void
-         */
-        void traverse_assign(TreeNode *node);
-
-        /**
-         * @brief Travering Binary Expression TreeNode  
-         * @return void
-         */
-        void traverse_binary_expression(TreeNode *node);
-
-        /**
-         * @brief Travering If Statement TreeNode  
-         * @return void
-         */
-        void traverse_if_statement(TreeNode *node);
-
-         /**
-         * @brief Print tokens.
-         * This method is only for checking if we got token vector or not.
-         * @return void
-         */       
-        void print_tokens();
 };

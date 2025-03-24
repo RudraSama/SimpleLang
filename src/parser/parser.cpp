@@ -1,11 +1,9 @@
-#include <lexer/lexer.h>
 #include <parser/parser.h>
-#include <iostream>
-#include <symbol_table/symbol_table.h>
 
-Parser::Parser(std::vector<Token> token_vector, std::string file_name){
+Parser::Parser(std::vector<Token> token_vector, std::string file_name, SymbolTable *ST){
     this->token_vector = std::move(token_vector);
     this->file_name = file_name;
+    this->ST = ST;
 }
 
 
@@ -24,16 +22,48 @@ bool Parser::expect(Token_Kind token_kind){
         return true;
     }
     if(peek().token_kind != Token_Kind::EOF_TOKEN){
-        std::string message = "Expected " + Lexer::token_to_string(token_kind).value + " Got " + peek().value;
-        report_syntax_error(message);
+        report_unexpected_syntax_error(token_kind, peek().token_kind);
     }
     return false;
 }
 
 
-void Parser::report_syntax_error(std::string message){
+void Parser::report_unexpected_syntax_error(Token_Kind expected, Token_Kind got){
     int line = peek().line;
     int column = peek().column;
+
+    std::string expect = Lexer::token_to_string(expected).value;
+    std::string _got = Lexer::token_to_string(got).value;
+    std::string message = "Expected " + expect + " , instead got " + _got;
+
+    std::cerr<<file_name<<":"<<line<<":"<<column<<" "<<message<<std::endl;
+}
+
+void Parser::report_undefined_variable_error(std::string s){
+    int line = peek().line;
+    int column = peek().column;
+    
+    std::string message = "Undefined Variable "+s;
+
+    std::cerr<<file_name<<":"<<line<<":"<<column<<" "<<message<<std::endl;
+   
+}
+
+void Parser::report_already_defined_variable_error(std::string s){
+    int line = peek().line;
+    int column = peek().column;
+    
+    std::string message = "Variable is already defined "+s;
+
+    std::cerr<<file_name<<":"<<line<<":"<<column<<" "<<message<<std::endl;
+}
+
+void Parser::report_memory_limit_exceed_error(std::string s){
+    int line = peek().line;
+    int column = peek().column;
+    
+    std::string message = "Memory Limit Exceeds 128 Bytes while declaring variable "+s;
+
     std::cerr<<file_name<<":"<<line<<":"<<column<<" "<<message<<std::endl;
 }
 
@@ -68,8 +98,8 @@ int Parser::literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token
     Literal *r = dynamic_cast<Literal*>(right);
     
     switch(token_kind){
-        case PLUS_TOKEN: return l->get_value() + r->get_value();
-        case MINUS_TOKEN: return l->get_value() - r->get_value();
+        case PLUS_TOKEN: return (int)l->get_value() + (int)r->get_value();
+        case MINUS_TOKEN: return (int)l->get_value() - (int)r->get_value();
         default: return 0;
     }
 }
@@ -77,75 +107,7 @@ int Parser::literal_evaluation(TreeNode *left, TreeNode *right, Token_Kind token
 
 TreeNode *Parser::parse(){
     TreeNode *node = program();
-    
-    traverse(node);
-
     return node;
-
-}
-
-void Parser::traverse(TreeNode *head){
-    if(head == nullptr) return;
-
-    while(head->get_next() != nullptr){
-        sub_traverse(head->get_node());
-        head = head->get_next();
-    }
-}
-
-void Parser::sub_traverse(TreeNode *node){
-    if(is_assign(node))
-        traverse_assign(node);
-    else if(is_if_statement(node))
-        traverse_if_statement(node);
-    else if(is_binary_expression(node))
-        traverse_binary_expression(node);
-    else if(is_identifier(node))
-        std::cout<<dynamic_cast<Identifier*>(node)->get_value();
-    else if(is_literal(node))
-        std::cout<<dynamic_cast<Literal*>(node)->get_value();
-}
-
-void Parser::traverse_assign(TreeNode *node){
-    Assign *assign = dynamic_cast<Assign*>(node);
-    std::cout<<dynamic_cast<Identifier*>(assign->get_left())->get_value();
-    std::cout<<assign->get_value();
-
-    sub_traverse(assign->get_right());
-
-    std::cout<<std::endl;
-}
-
-void Parser::traverse_binary_expression(TreeNode *node){
-    BinaryExpr *binary_expr = dynamic_cast<BinaryExpr*>(node);
-
-    sub_traverse(binary_expr->get_left());
-
-    std::cout<<binary_expr->get_value();
-
-    sub_traverse(binary_expr->get_right());
-}
-
-void Parser::traverse_if_statement(TreeNode *node){
-    IFStatement *if_statement = dynamic_cast<IFStatement*>(node);
-
-    std::cout<<"if (";
-
-    sub_traverse(if_statement->get_left());
-
-    std::cout<<if_statement->get_value();
-
-    sub_traverse(if_statement->get_left());
-
-    std::cout<<"){";
-
-    std::cout<<std::endl;
-
-    traverse(if_statement->get_block());
-
-    std::cout<<"}";
-
-    std::cout<<std::endl;
 }
 
 TreeNode *Parser::program(){
@@ -164,7 +126,19 @@ TreeNode *Parser::parse_statements(){
             next_token();
             if(!expect(Token_Kind::IDENTIFIER_TOKEN)) return nullptr;
 
-            ST.insert_symbol(peek().value, "int");
+            if(ST->exist(peek().value)){
+                report_already_defined_variable_error(peek().value);
+                delete statements_head;
+                statements_head = nullptr;
+                return nullptr;
+            }
+
+            if(!ST->insert_symbol(peek().value, "int")){
+                report_memory_limit_exceed_error(peek().value);
+                delete statements_head;
+                statements_head = nullptr;
+                return nullptr;
+            }
 
             node = parse_statement();
             if(!node && peek().token_kind == Token_Kind::SEMICOLON_TOKEN){
@@ -210,7 +184,7 @@ TreeNode *Parser::parse_ifstatement(){
     TreeNode *left = parse_expression();
     if(!left) return nullptr;
 
-    std::string value = peek().value;
+    Token_Kind token_kind = peek().token_kind;
     next_token();
 
     TreeNode *right = parse_expression();
@@ -226,7 +200,7 @@ TreeNode *Parser::parse_ifstatement(){
 
     if(!expect(Token_Kind::CLOSEBRAC_TOKEN)) return nullptr;
     
-    return new IFStatement(left, value, right, block);
+    return new IFStatement(left, token_kind, right, block);
 }
 
 
@@ -238,9 +212,8 @@ TreeNode *Parser::parse_statement(){
     if(peek().token_kind == Token_Kind::SEMICOLON_TOKEN) return nullptr;
 
     if(!expect(Token_Kind::ASSIGN_TOKEN)) return nullptr;
-    if(!ST.exist(t.value)){
-        std::string message = "Variable "+ t.value + " is not defined ";
-        report_syntax_error(message);
+    if(!ST->exist(t.value)){
+        report_undefined_variable_error(t.value);
         return nullptr;
     }
 
@@ -266,11 +239,17 @@ TreeNode *Parser::parse_term(){
     }
     else if(peek().token_kind == Token_Kind::IDENTIFIER_TOKEN){
         node = new Identifier(peek().value);
-        if(!ST.exist(peek().value)){
-            std::string message = "Variable "+ peek().value + " is not defined ";
-            report_syntax_error(message);
+        if(!ST->exist(peek().value)){
+            report_undefined_variable_error(peek().value);
             node = nullptr;
         }
+        next_token();
+    }
+    else if(peek().token_kind == Token_Kind::MINUS_TOKEN){
+        next_token();
+        if(!expect(Token_Kind::NUMBER_TOKEN)) return nullptr;
+        int num = std::atoi(peek().value.c_str()) * -1;
+        node = new Literal(num);
         next_token();
     }
     else if(peek().token_kind == Token_Kind::OPENPAREN_TOKEN){
@@ -280,7 +259,7 @@ TreeNode *Parser::parse_term(){
         next_token(); //skipping ')'
     }
     else{
-        report_syntax_error("Expected Identifer or Number");
+        report_unexpected_syntax_error(Token_Kind::IDENTIFIER_TOKEN, peek().token_kind);
     }
     return node;
 }
@@ -301,8 +280,7 @@ TreeNode *Parser::parse_expression(){
                 left = new Literal(literal_evaluation(left, right, token.token_kind));
             }
             else{
-                std::string symbol = token.token_kind == (Token_Kind::PLUS_TOKEN)?"+":"-";
-                left = new BinaryExpr(left, symbol, right);
+                left = new BinaryExpr(left, token.token_kind, right);
             }
         }
         else{
@@ -311,14 +289,7 @@ TreeNode *Parser::parse_expression(){
     }
     
     //This statement will only run when peek() reached at EOF and didn't find any valid syntax
-    std::string message = "Expected " + Lexer::token_to_string(Token_Kind::SEMICOLON_TOKEN).value;
-    report_syntax_error(message);
+    report_unexpected_syntax_error(Token_Kind::SEMICOLON_TOKEN, peek().token_kind);
     
     return nullptr;
-}
-
-void Parser::print_tokens(){
-    for(auto t : token_vector){
-        std::cout<<t.value;
-    }
 }
