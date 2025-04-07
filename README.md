@@ -84,6 +84,5 @@ This will build documentation in `docs` folder. Just open `index.html` file in b
  - Adding (software) support for Negative numbers.
  - Adding support for more comparison operators
 
-  
-
-
+## Reference 
+[8 Bit CPU Simulator](https://github.com/lightcode/8bit-computer)
